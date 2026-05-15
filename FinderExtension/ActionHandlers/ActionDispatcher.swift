@@ -1,19 +1,30 @@
 import Cocoa
 import FinderSync
 
-final class ActionDispatcher {
+final class ActionDispatcher: NSObject {
+
+    static let shared = ActionDispatcher()
 
     private let fileCreator = FileCreator()
     private let pathCopier = PathCopier()
     private let scriptRunner = ScriptRunner()
+    private let authorizedFolderStore = AuthorizedFolderStore.shared
 
-    func dispatch(_ action: MenuAction) {
+    // MARK: - Core dispatch
+
+    func dispatch(
+        _ action: MenuAction,
+        selectedURLs: [URL]? = nil,
+        targetURL: URL? = nil,
+        isContainerMenu: Bool = false
+    ) {
+        NSLog("[RightMenu] dispatch: \(action.type.rawValue)")
         switch action.type {
         case .copyPath:   pathCopier.copyPath()
         case .copyName:   pathCopier.copyName()
-        case .openTerminal: openTerminal()
-        case .openITerm:  openITerm()
-        case .deleteFile: trashSelectedItems()
+        case .openTerminal: openTerminal(targetURL: targetURL, selectedURLs: selectedURLs, isContainerMenu: isContainerMenu)
+        case .openITerm:  openITerm(targetURL: targetURL, selectedURLs: selectedURLs, isContainerMenu: isContainerMenu)
+        case .deleteFile: trashSelectedItems(selectedURLs: selectedURLs)
         case .lockFile:   lockSelectedItems()
         case .showInfo:   showFileInfo()
         case .makeAlias:  makeDesktopAlias()
@@ -23,20 +34,33 @@ final class ActionDispatcher {
         }
     }
 
-    func createFile(from template: FileTemplate) {
-        guard let targetURL = FIFinderSyncController.default().targetedURL() else { return }
-        fileCreator.createFile(from: template, at: targetURL)
+    func createFile(
+        from template: FileTemplate,
+        targetURL cachedTargetURL: URL? = nil,
+        selectedURLs cachedSelectedURLs: [URL]? = nil,
+        isContainerMenu: Bool = false
+    ) {
+        let url = cachedTargetURL ?? FIFinderSyncController.default().targetedURL()
+        let selectedURLs = cachedSelectedURLs ?? FIFinderSyncController.default().selectedItemURLs() ?? []
+        NSLog("[RightMenu] createFile targetedURL: \(url?.path ?? "nil"), selected=\(selectedURLs.map { $0.path }), isContainerMenu=\(isContainerMenu)")
+        guard let targetURL = url else { return }
+        let directoryURL = FinderTargetResolver.creationDirectory(
+            targetURL: targetURL,
+            selectedURLs: selectedURLs,
+            isContainerMenu: isContainerMenu
+        )
+        NSLog("[RightMenu] createFile directoryURL: \(directoryURL.path)")
+        fileCreator.createFile(from: template, at: directoryURL)
     }
 
-    func runScript(action: MenuAction) {
+    func runScript(action: MenuAction, targetURL cachedTargetURL: URL? = nil) {
         guard let script = action.scriptContent,
-              let targetURL = FIFinderSyncController.default().targetedURL() else { return }
+              let targetURL = cachedTargetURL ?? FIFinderSyncController.default().targetedURL() else { return }
         scriptRunner.run(script: script, at: targetURL)
     }
 
     func moveItems(to destination: String) {
-        let items = FIFinderSyncController.default().selectedItemURLs() ?? []
-        for url in items {
+        for url in FIFinderSyncController.default().selectedItemURLs() ?? [] {
             try? FileManager.default.moveItem(
                 at: url,
                 to: URL(fileURLWithPath: destination).appendingPathComponent(url.lastPathComponent)
@@ -45,8 +69,7 @@ final class ActionDispatcher {
     }
 
     func copyItems(to destination: String) {
-        let items = FIFinderSyncController.default().selectedItemURLs() ?? []
-        for url in items {
+        for url in FIFinderSyncController.default().selectedItemURLs() ?? [] {
             try? FileManager.default.copyItem(
                 at: url,
                 to: URL(fileURLWithPath: destination).appendingPathComponent(url.lastPathComponent)
@@ -56,50 +79,88 @@ final class ActionDispatcher {
 
     // MARK: - Terminal
 
-    private func openTerminal() {
-        guard let targetURL = FIFinderSyncController.default().targetedURL() else { return }
-        NSWorkspace.shared.open(
-            [URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")],
-            withApplicationAt: URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"),
-            configuration: NSWorkspace.OpenConfiguration()
-        ) { _, _ in }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            let safePath = targetURL.path.replacingOccurrences(of: "\"", with: "\\\"")
-            NSAppleScript(source: "tell application \"Terminal\"\nactivate\ndo script \"cd \(safePath)\"\nend tell")?
-                .executeAndReturnError(nil)
+    private func openTerminal(
+        targetURL cachedTargetURL: URL? = nil,
+        selectedURLs cachedSelectedURLs: [URL]? = nil,
+        isContainerMenu: Bool = false
+    ) {
+        guard let targetURL = cachedTargetURL ?? FIFinderSyncController.default().targetedURL() else {
+            NSLog("[RightMenu] openTerminal: missing targetURL")
+            return
         }
+        openDirectoryInApp(
+            targetURL,
+            selectedURLs: cachedSelectedURLs ?? FIFinderSyncController.default().selectedItemURLs() ?? [],
+            isContainerMenu: isContainerMenu,
+            command: .openTerminal,
+            appName: "Terminal"
+        )
     }
 
-    private func openITerm() {
-        guard let targetURL = FIFinderSyncController.default().targetedURL() else { return }
-        let path = targetURL.path.replacingOccurrences(of: "\"", with: "\\\"")
-        let script = """
-        tell application "iTerm"
-            if it is running then
-                tell current window
-                    create tab with default profile
-                    tell current session
-                        write text "cd \\"\(path)\\"; clear"
-                    end tell
-                end tell
-            else
-                tell current window
-                    tell current session
-                        write text "cd \\"\(path)\\"; clear"
-                    end tell
-                end tell
-            end if
-            activate
-        end tell
-        """
-        NSAppleScript(source: script)?.executeAndReturnError(nil)
+    private func openITerm(
+        targetURL cachedTargetURL: URL? = nil,
+        selectedURLs cachedSelectedURLs: [URL]? = nil,
+        isContainerMenu: Bool = false
+    ) {
+        guard let targetURL = cachedTargetURL ?? FIFinderSyncController.default().targetedURL() else {
+            NSLog("[RightMenu] openITerm: missing targetURL")
+            return
+        }
+        openDirectoryInApp(
+            targetURL,
+            selectedURLs: cachedSelectedURLs ?? FIFinderSyncController.default().selectedItemURLs() ?? [],
+            isContainerMenu: isContainerMenu,
+            command: .openITerm,
+            appName: "iTerm"
+        )
+    }
+
+    private func openDirectoryInApp(
+        _ targetURL: URL,
+        selectedURLs: [URL],
+        isContainerMenu: Bool,
+        command: AppCommand,
+        appName: String
+    ) {
+        let directoryURL = FinderTargetResolver.creationDirectory(
+            targetURL: targetURL,
+            selectedURLs: selectedURLs,
+            isContainerMenu: isContainerMenu
+        )
+
+        NSLog("[RightMenu] request open \(appName) at \(directoryURL.path)")
+        guard let commandURL = AppCommandURL.url(command: command, path: directoryURL.path) else {
+            NSLog("[RightMenu] open \(appName) command URL build failed: \(directoryURL.path)")
+            return
+        }
+        NSWorkspace.shared.open(commandURL)
     }
 
     // MARK: - File Operations
 
-    private func trashSelectedItems() {
-        for url in FIFinderSyncController.default().selectedItemURLs() ?? [] {
-            try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
+    private func trashSelectedItems(selectedURLs cachedSelectedURLs: [URL]? = nil) {
+        let urls = cachedSelectedURLs ?? FIFinderSyncController.default().selectedItemURLs() ?? []
+        guard !urls.isEmpty else {
+            NSLog("[RightMenu] trashSelectedItems: no selected URLs")
+            return
+        }
+
+        NSLog("[RightMenu] trashSelectedItems: \(urls.map { $0.path })")
+        for url in urls {
+            do {
+                try authorizedFolderStore.withAccess(to: url) {
+                    var trashedURL: NSURL?
+                    try FileManager.default.trashItem(at: url, resultingItemURL: &trashedURL)
+                    NSLog("[RightMenu] trashed item: \(url.path)")
+                }
+            } catch {
+                NSLog("[RightMenu] trash failed: \(error.localizedDescription), path: \(url.path)")
+                // Fallback: delegate to main app
+                if let commandURL = AppCommandURL.url(command: .trashFile, path: url.path) {
+                    NSLog("[RightMenu] Delegating trash to main app for: \(url.path)")
+                    NSWorkspace.shared.open(commandURL)
+                }
+            }
         }
     }
 
@@ -126,7 +187,7 @@ final class ActionDispatcher {
     }
 
     private func makeDesktopAlias() {
-        let desktop = FileManager.default.homeDirectoryForCurrentUser
+        let desktop = RealHomeDirectory.url
             .appendingPathComponent("Desktop")
         for url in FIFinderSyncController.default().selectedItemURLs() ?? [] {
             let aliasURL = desktop.appendingPathComponent("\(url.lastPathComponent) alias")
@@ -181,4 +242,5 @@ final class ActionDispatcher {
             NSWorkspace.shared.setIcon(icon, forFile: url.path)
         }
     }
+
 }
