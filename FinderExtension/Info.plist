@@ -23,6 +23,8 @@
 	<string>XPC!</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.5</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>RightMenu Master uses accessibility automation only to enter rename mode after creating a file.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License</string>
 </dict>

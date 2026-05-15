@@ -8,7 +8,6 @@ final class ActionDispatcher: NSObject {
     private let fileCreator = FileCreator()
     private let pathCopier = PathCopier()
     private let scriptRunner = ScriptRunner()
-    private let authorizedFolderStore = AuthorizedFolderStore.shared
 
     // MARK: - Core dispatch
 
@@ -148,18 +147,11 @@ final class ActionDispatcher: NSObject {
         NSLog("[RightMenu] trashSelectedItems: \(urls.map { $0.path })")
         for url in urls {
             do {
-                try authorizedFolderStore.withAccess(to: url) {
-                    var trashedURL: NSURL?
-                    try FileManager.default.trashItem(at: url, resultingItemURL: &trashedURL)
-                    NSLog("[RightMenu] trashed item: \(url.path)")
-                }
+                var trashedURL: NSURL?
+                try FileManager.default.trashItem(at: url, resultingItemURL: &trashedURL)
+                NSLog("[RightMenu] trashed item: \(url.path)")
             } catch {
                 NSLog("[RightMenu] trash failed: \(error.localizedDescription), path: \(url.path)")
-                // Fallback: delegate to main app
-                if let commandURL = AppCommandURL.url(command: .trashFile, path: url.path) {
-                    NSLog("[RightMenu] Delegating trash to main app for: \(url.path)")
-                    NSWorkspace.shared.open(commandURL)
-                }
             }
         }
     }

@@ -32,4 +32,18 @@ extension UserDefaults {
         set(data, forKey: Constants.templatesKey)
         synchronize()
     }
+
+    func loadAuthorizedFolders() -> [AuthorizedFolderGrant] {
+        guard let data = data(forKey: Constants.authorizedFoldersKey),
+              let folders = try? JSONDecoder().decode([AuthorizedFolderGrant].self, from: data) else {
+            return []
+        }
+        return folders
+    }
+
+    func saveAuthorizedFolders(_ folders: [AuthorizedFolderGrant]) {
+        guard let data = try? JSONEncoder().encode(folders) else { return }
+        set(data, forKey: Constants.authorizedFoldersKey)
+        synchronize()
+    }
 }

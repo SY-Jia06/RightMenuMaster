@@ -43,6 +43,9 @@ enum FinderMonitorDirectories {
             home.appendingPathComponent("Desktop", isDirectory: true),
             home.appendingPathComponent("Documents", isDirectory: true),
             home.appendingPathComponent("Downloads", isDirectory: true),
+            home.appendingPathComponent("Library", isDirectory: true),
+            home.appendingPathComponent("Library/Mobile Documents", isDirectory: true),
+            home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true),
         ]
 
         for grant in authorizedFolders {

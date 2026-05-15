@@ -9,12 +9,10 @@ struct AppConfig: Codable {
     static let `default` = AppConfig(
         enabledActions: [
             MenuAction(title: ActionType.newFile.defaultTitle, type: .newFile, sortOrder: 0),
-            MenuAction(title: ActionType.copyPath.defaultTitle, type: .copyPath, sortOrder: 2),
-            MenuAction(title: ActionType.copyName.defaultTitle, type: .copyName, sortOrder: 3),
-            MenuAction(title: ActionType.openTerminal.defaultTitle, type: .openTerminal, sortOrder: 4),
-            MenuAction(title: ActionType.copyTo.defaultTitle, type: .copyTo, sortOrder: 5),
-            MenuAction(title: ActionType.moveTo.defaultTitle, type: .moveTo, sortOrder: 6),
-            MenuAction(title: ActionType.deleteFile.defaultTitle, type: .deleteFile, sortOrder: 7),
+            MenuAction(title: ActionType.copyPath.defaultTitle, type: .copyPath, sortOrder: 1),
+            MenuAction(title: ActionType.copyName.defaultTitle, type: .copyName, sortOrder: 2),
+            MenuAction(title: ActionType.openTerminal.defaultTitle, type: .openTerminal, sortOrder: 3),
+            MenuAction(title: ActionType.deleteFile.defaultTitle, type: .deleteFile, sortOrder: 4),
         ],
         customTemplates: [],
         moveToFolders: [],

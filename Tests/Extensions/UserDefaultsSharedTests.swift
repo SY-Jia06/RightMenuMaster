@@ -7,11 +7,15 @@ final class UserDefaultsSharedTests: XCTestCase {
         super.setUp()
         UserDefaults.shared.removeObject(forKey: Constants.configKey)
         UserDefaults.shared.removeObject(forKey: Constants.templatesKey)
+        UserDefaults.shared.removeObject(forKey: Constants.authorizedFoldersKey)
+        UserDefaults.shared.removeObject(forKey: Constants.pendingFileCreationRequestsKey)
     }
 
     override func tearDown() {
         UserDefaults.shared.removeObject(forKey: Constants.configKey)
         UserDefaults.shared.removeObject(forKey: Constants.templatesKey)
+        UserDefaults.shared.removeObject(forKey: Constants.authorizedFoldersKey)
+        UserDefaults.shared.removeObject(forKey: Constants.pendingFileCreationRequestsKey)
         super.tearDown()
     }
 
@@ -47,5 +51,49 @@ final class UserDefaultsSharedTests: XCTestCase {
         let loaded = UserDefaults.shared.loadTemplates()
         XCTAssertEqual(loaded.count, 2)
         XCTAssertEqual(loaded.map(\.name).sorted(), ["Custom1", "Custom2"])
+    }
+
+    func testSaveAndLoadAuthorizedFolders() {
+        let folders = [
+            AuthorizedFolderGrant(path: "/Users/j/Downloads", bookmarkData: Data([1, 2, 3])),
+        ]
+        UserDefaults.shared.saveAuthorizedFolders(folders)
+
+        let loaded = UserDefaults.shared.loadAuthorizedFolders()
+        XCTAssertEqual(loaded, folders)
+    }
+
+    func testAuthorizedFolderMatchingUsesPathBoundaryAndLongestPrefix() {
+        let folders = [
+            AuthorizedFolderGrant(path: "/Users/j", bookmarkData: Data([1])),
+            AuthorizedFolderGrant(path: "/Users/j/Downloads", bookmarkData: Data([2])),
+        ]
+
+        let matched = AuthorizedFolderStore.authorizedFolder(
+            containing: URL(fileURLWithPath: "/Users/j/Downloads/example.txt"),
+            in: folders
+        )
+
+        XCTAssertEqual(matched?.path, "/Users/j/Downloads")
+        XCTAssertNil(
+            AuthorizedFolderStore.authorizedFolder(
+                containing: URL(fileURLWithPath: "/Users/j/Downloads-old/example.txt"),
+                in: [folders[1]]
+            )
+        )
+    }
+
+    func testPendingFileCreationStoreRoundTripsRequests() {
+        let store = PendingFileCreationStore(defaults: .shared)
+        let request = PendingFileCreationRequest(
+            directoryPath: "/Users/j/工作区/Projects/claude",
+            template: FileTemplate(name: "Plain Text", ext: "txt", content: "")
+        )
+
+        store.save(request)
+
+        XCTAssertEqual(store.load(id: request.id), request)
+        store.remove(id: request.id)
+        XCTAssertNil(store.load(id: request.id))
     }
 }

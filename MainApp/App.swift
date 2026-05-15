@@ -28,15 +28,9 @@ struct RightMenuMasterApp: App {
     }
     
     private func checkAndRequestInitialPermissions() {
-        let hasRequestedPermission = UserDefaults.standard.bool(forKey: "hasRequestedInitialPermission")
-        let authorizedFolders = AuthorizedFolderStore.shared.load()
-        
-        if !hasRequestedPermission || authorizedFolders.isEmpty {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                viewModel.authorizeHomeFolder()
-                UserDefaults.standard.set(true, forKey: "hasRequestedInitialPermission")
-            }
-        }
+        // Disabled auto-prompt during development to avoid blocking the UI.
+        // Users can manually click "Enable Everywhere" in the Permissions tab.
+        NSLog("[RightMenu] App launched. Authorized folders: \(AuthorizedFolderStore.shared.load().map(\.path))")
     }
 }
 
