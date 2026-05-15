@@ -107,7 +107,7 @@ struct TemplateEditorView: View {
 
                 TextField("Name", text: $templateName)
                     .disabled(template.isBuiltIn)
-                    .onChange(of: templateName) { newValue in
+                    .onChange(of: templateName) { _, newValue in
                         var updated = template
                         updated.name = newValue
                         viewModel.updateTemplate(updated)
@@ -115,7 +115,7 @@ struct TemplateEditorView: View {
 
                 TextField("Extension", text: $fileExt)
                     .disabled(template.isBuiltIn)
-                    .onChange(of: fileExt) { newValue in
+                    .onChange(of: fileExt) { _, newValue in
                         var updated = template
                         updated.ext = newValue
                         viewModel.updateTemplate(updated)
@@ -126,7 +126,7 @@ struct TemplateEditorView: View {
                 TextEditor(text: $content)
                     .font(.system(.body, design: .monospaced))
                     .frame(minHeight: 200)
-                    .onChange(of: content) { newValue in
+                    .onChange(of: content) { _, newValue in
                         var updated = template
                         updated.content = newValue
                         viewModel.updateTemplate(updated)

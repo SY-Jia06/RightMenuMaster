@@ -72,7 +72,7 @@ struct ScriptRow: View {
                 .font(.system(.body, design: .monospaced))
                 .frame(minHeight: 100)
                 .border(.secondary.opacity(0.3))
-                .onChange(of: scriptContent) { viewModel.updateScript(for: action, content: $0) }
+                .onChange(of: scriptContent) { _, newValue in viewModel.updateScript(for: action, content: newValue) }
 
             Text("Script runs in Terminal at the selected directory. Use cautiously.")
                 .font(.caption)

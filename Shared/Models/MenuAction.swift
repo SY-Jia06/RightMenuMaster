@@ -1,6 +1,6 @@
 import Foundation
 
-struct MenuAction: Identifiable, Codable, Equatable {
+struct MenuAction: Identifiable, Codable, Hashable {
     let id: UUID
     var title: String
     var type: ActionType

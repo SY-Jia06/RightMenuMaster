@@ -104,7 +104,7 @@ struct ActionDetailView: View {
         Form {
             Section("Action Info") {
                 TextField("Title", text: $title)
-                    .onChange(of: title) { viewModel.updateActionTitle(action, title: $0) }
+                    .onChange(of: title) { _, newValue in viewModel.updateActionTitle(action, title: newValue) }
 
                 LabeledContent("Type", value: action.type.rawValue)
 
@@ -119,7 +119,7 @@ struct ActionDetailView: View {
                     TextEditor(text: $script)
                         .font(.system(.body, design: .monospaced))
                         .frame(minHeight: 150)
-                        .onChange(of: script) { viewModel.updateScript(for: action, content: $0) }
+                        .onChange(of: script) { _, newValue in viewModel.updateScript(for: action, content: newValue) }
                 }
             }
 

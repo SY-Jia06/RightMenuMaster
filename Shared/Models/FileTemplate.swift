@@ -1,6 +1,6 @@
 import Foundation
 
-struct FileTemplate: Identifiable, Codable, Equatable {
+struct FileTemplate: Identifiable, Codable, Hashable {
     let id: UUID
     var name: String
     var ext: String
