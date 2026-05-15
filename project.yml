@@ -1,0 +1,48 @@
+name: RightMenuMaster
+options:
+  bundleIdPrefix: com.rightmenu.master
+  deploymentTarget:
+    macOS: "14.5"
+  xcodeVersion: "16.0"
+
+settings:
+  SWIFT_VERSION: "5.9"
+
+targets:
+  RightMenuMaster:
+    type: application
+    platform: macOS
+    sources:
+      - path: MainApp
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rightmenu.master
+        INFOPLIST_FILE: MainApp/Info.plist
+        GENERATE_INFOPLIST_FILE: false
+        CODE_SIGN_ENTITLEMENTS: MainApp/RightMenuMaster.entitlements
+        DEVELOPMENT_TEAM: ""
+    dependencies:
+      - target: FinderExtension
+        embed: true
+    preBuildScripts:
+      - name: SwiftLint
+        script: |
+          if which swiftlint >/dev/null; then
+            swiftlint
+          fi
+        basedOnDependencyAnalysis: false
+
+  FinderExtension:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: FinderExtension
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rightmenu.master.finder-extension
+        INFOPLIST_FILE: FinderExtension/Info.plist
+        GENERATE_INFOPLIST_FILE: false
+        CODE_SIGN_ENTITLEMENTS: FinderExtension/FinderExtension.entitlements
+        DEVELOPMENT_TEAM: ""
