@@ -33,6 +33,19 @@ targets:
           fi
         basedOnDependencyAnalysis: false
 
+  RightMenuMasterTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rightmenu.master.tests
+        GENERATE_INFOPLIST_FILE: true
+    dependencies:
+      - target: RightMenuMaster
+
   FinderExtension:
     type: app-extension
     platform: macOS
