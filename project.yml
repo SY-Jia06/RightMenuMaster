@@ -23,7 +23,6 @@ targets:
         INFOPLIST_FILE: MainApp/Info.plist
         GENERATE_INFOPLIST_FILE: false
         CODE_SIGN_ENTITLEMENTS: MainApp/RightMenuMaster.entitlements
-        DEVELOPMENT_TEAM: H469Z3UP2N
     dependencies:
       - target: FinderExtension
         embed: true
@@ -59,4 +58,3 @@ targets:
         INFOPLIST_FILE: FinderExtension/Info.plist
         GENERATE_INFOPLIST_FILE: false
         CODE_SIGN_ENTITLEMENTS: FinderExtension/FinderExtension.entitlements
-        DEVELOPMENT_TEAM: H469Z3UP2N

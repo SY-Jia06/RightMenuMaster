@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   build-and-test:
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -32,7 +32,8 @@ jobs:
             build \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGNING_REQUIRED=NO \
+            DEVELOPMENT_TEAM=""
 
       - name: Test
         run: |
@@ -44,13 +45,5 @@ jobs:
             test \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: app-bundle
-          path: |
-            ~/Library/Developer/Xcode/DerivedData/**/Build/Products/Debug/*.app
-            ~/Library/Developer/Xcode/DerivedData/**/Build/Products/Debug/*.appex
+            CODE_SIGNING_REQUIRED=NO \
+            DEVELOPMENT_TEAM=""
