@@ -1,5 +1,9 @@
 # RightMenu Master
 
+<p align="center">
+  <img src="icon.png" width="128" height="128" alt="RightMenu Master Icon">
+</p>
+
 RightMenu Master is a macOS Finder right-click enhancement app built with SwiftUI and a Finder Sync Extension. It adds configurable Finder context-menu actions such as creating files, copying paths, deleting items, and opening Terminal in the selected directory.
 
 Current development target: macOS 14.5+.
