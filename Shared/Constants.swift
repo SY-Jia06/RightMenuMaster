@@ -185,10 +185,15 @@ final class AuthorizedFolderStore {
         guard !hasMigrated else { return }
         hasMigrated = true
 
+        // Skip migration if no App Group container (ad-hoc builds)
+        guard Self.appGroupContainerURL != nil else { return }
+
         var folders = load()
+        guard !folders.isEmpty else { return }
         var didMigrate = false
 
         for (index, grant) in folders.enumerated() {
+            guard !grant.bookmarkData.isEmpty else { continue }
             var isStale = false
             // Try document-scope resolution first
             if let _ = try? URL(
@@ -247,11 +252,19 @@ final class AuthorizedFolderStore {
     @discardableResult
     func authorizeFolder(_ url: URL) throws -> AuthorizedFolderGrant {
         let folderURL = url.standardizedFileURL
-        let bookmarkData = try folderURL.bookmarkData(
-            options: [.withSecurityScope],
-            includingResourceValuesForKeys: nil,
-            relativeTo: Self.appGroupContainerURL
-        )
+        let bookmarkData: Data
+        do {
+            bookmarkData = try folderURL.bookmarkData(
+                options: [.withSecurityScope],
+                includingResourceValuesForKeys: nil,
+                relativeTo: Self.appGroupContainerURL
+            )
+        } catch {
+            // Fallback: store empty bookmark data when App Group container is unavailable
+            // (e.g., ad-hoc signed builds without provisioning profile)
+            NSLog("[RightMenu] Bookmark creation failed (App Group unavailable?): \(error.localizedDescription)")
+            bookmarkData = Data()
+        }
         let grant = AuthorizedFolderGrant(path: folderURL.path, bookmarkData: bookmarkData)
 
         var folders = load().filter { $0.path != grant.path }
@@ -268,7 +281,8 @@ final class AuthorizedFolderStore {
     func withAccess<T>(to url: URL, perform operation: () throws -> T) throws -> T {
         migrateBookmarksIfNeeded()
 
-        guard let grant = Self.authorizedFolder(containing: url, in: load()) else {
+        guard let grant = Self.authorizedFolder(containing: url, in: load()),
+              !grant.bookmarkData.isEmpty else {
             return try operation()
         }
 
