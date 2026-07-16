@@ -49,6 +49,8 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
   private let storageKey: String
   private let monitoredFoldersKey: String
   private let fileManager: FileManager
+  private let homeDirectoryURL: URL
+  private let usesSecurityScopedAccess: Bool
   private let startAccessing: (URL) -> Bool
   private let stopAccessing: (URL) -> Void
   /// Keep each granted root active for the lifetime of the host process.
@@ -63,6 +65,9 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
     storageKey: String = "v2.securityScopedFolderGrants",
     monitoredFoldersKey: String = Constants.v2MonitoredFolderPathsKey,
     fileManager: FileManager = .default,
+    homeDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser,
+    usesSecurityScopedAccess: Bool = ProcessInfo.processInfo.environment[
+      "APP_SANDBOX_CONTAINER_ID"] != nil,
     startAccessing: @escaping (URL) -> Bool = { $0.startAccessingSecurityScopedResource() },
     stopAccessing: @escaping (URL) -> Void = { $0.stopAccessingSecurityScopedResource() }
   ) {
@@ -71,6 +76,8 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
     self.storageKey = storageKey
     self.monitoredFoldersKey = monitoredFoldersKey
     self.fileManager = fileManager
+    self.homeDirectoryURL = homeDirectoryURL.standardizedFileURL
+    self.usesSecurityScopedAccess = usesSecurityScopedAccess
     self.startAccessing = startAccessing
     self.stopAccessing = stopAccessing
     load()
@@ -87,7 +94,7 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
 
     let canonicalURL = folderURL.standardizedFileURL
     let bookmark = try canonicalURL.bookmarkData(
-      options: .withSecurityScope,
+      options: usesSecurityScopedAccess ? .withSecurityScope : [],
       includingResourceValuesForKeys: [.nameKey, .isDirectoryKey],
       relativeTo: nil
     )
@@ -105,8 +112,8 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
     grants.removeAll { pathsAreEqual($0.path, grant.path) }
     grants.append(grant)
     grants.sort { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
-    try persist()
     _ = try ensurePersistentAccess(for: grant)
+    try persist()
     return grant
   }
 
@@ -169,6 +176,10 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
     try persist()
   }
 
+  func refreshMonitoredFolders() throws {
+    try persist()
+  }
+
   func grant(containing url: URL) -> SecurityScopedFolderGrant? {
     let targetComponents = url.standardizedFileURL.pathComponents
     return
@@ -215,6 +226,10 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
       return activeURL
     }
     let grantedURL = try resolve(grant)
+    guard usesSecurityScopedAccess else {
+      activeAccessURLs[grant.id] = grantedURL
+      return grantedURL
+    }
     guard startAccessing(grantedURL) else {
       throw SecurityScopedGrantError.accessDenied(grant.displayName)
     }
@@ -224,7 +239,7 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
 
   private func stopPersistentAccess(for grant: SecurityScopedFolderGrant) {
     guard let activeURL = activeAccessURLs.removeValue(forKey: grant.id) else { return }
-    stopAccessing(activeURL)
+    if usesSecurityScopedAccess { stopAccessing(activeURL) }
   }
 
   func resolve(_ grant: SecurityScopedFolderGrant) throws -> URL {
@@ -233,12 +248,24 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
     do {
       url = try URL(
         resolvingBookmarkData: grant.bookmarkData,
-        options: [.withSecurityScope, .withoutUI],
+        options: usesSecurityScopedAccess ? [.withSecurityScope, .withoutUI] : [.withoutUI],
         relativeTo: nil,
         bookmarkDataIsStale: &isStale
       )
     } catch {
-      throw SecurityScopedGrantError.bookmarkUnavailable(grant.displayName)
+      // Beta 2 stored security-scoped bookmarks. The free Beta 3 host is not
+      // sandboxed, but must still resolve those bookmarks during migration.
+      guard !usesSecurityScopedAccess,
+        let migratedURL = try? URL(
+          resolvingBookmarkData: grant.bookmarkData,
+          options: [.withSecurityScope, .withoutUI],
+          relativeTo: nil,
+          bookmarkDataIsStale: &isStale
+        )
+      else {
+        throw SecurityScopedGrantError.bookmarkUnavailable(grant.displayName)
+      }
+      url = migratedURL
     }
 
     if isStale {
@@ -261,7 +288,7 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
     defaults.set(try JSONEncoder().encode(grants), forKey: storageKey)
     // Finder extension receives only lexical paths needed for directoryURLs.
     // Security-scoped bookmark bytes remain private to the host application.
-    monitoredFoldersDefaults?.set(grants.map(\.path).sorted(), forKey: monitoredFoldersKey)
+    monitoredFoldersDefaults?.set(finderMonitorPaths(), forKey: monitoredFoldersKey)
     DistributedNotificationCenter.default().postNotificationName(
       Notification.Name(Constants.v2MonitoredFoldersChangedNotificationName),
       object: Bundle.main.bundleIdentifier,
@@ -273,6 +300,39 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
   private func pathsAreEqual(_ lhs: String, _ rhs: String) -> Bool {
     URL(fileURLWithPath: lhs).standardizedFileURL.pathComponents
       == URL(fileURLWithPath: rhs).standardizedFileURL.pathComponents
+  }
+
+  /// Finder Sync does not reliably activate when the user's entire Home is the
+  /// only directory URL. Expand that one grant into ordinary first-level
+  /// folders, which still cover every deeper descendant. Never monitor Library
+  /// or hidden roots: those contain other applications' protected data.
+  private func finderMonitorPaths() -> [String] {
+    var paths = Set(grants.map(\.path))
+    guard let homeGrant = grants.first(where: {
+      pathsAreEqual($0.path, homeDirectoryURL.path)
+    }) else {
+      return paths.sorted()
+    }
+    // Loading a bookmark does not activate its scope. Activate Home before
+    // enumerating its ordinary first-level folders from a sandboxed process.
+    _ = try? ensurePersistentAccess(for: homeGrant)
+
+    let keys: Set<URLResourceKey> = [.isDirectoryKey, .isHiddenKey]
+    let children =
+      (try? fileManager.contentsOfDirectory(
+        at: homeDirectoryURL,
+        includingPropertiesForKeys: Array(keys),
+        options: [.skipsHiddenFiles]
+      )) ?? []
+    for child in children {
+      guard child.lastPathComponent != "Library",
+        let values = try? child.resourceValues(forKeys: keys),
+        values.isDirectory == true,
+        values.isHidden != true
+      else { continue }
+      paths.insert(child.standardizedFileURL.path)
+    }
+    return paths.sorted()
   }
 
   private func isAncestorPath(_ path: String, ofComponents target: [String]) -> Bool {

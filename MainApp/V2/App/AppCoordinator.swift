@@ -203,6 +203,7 @@ final class AppCoordinator: ObservableObject {
   }
 
   func applicationDidBecomeActive() {
+    try? folderGrants.refreshMonitoredFolders()
     applicationCatalog.refresh(
       including: config.preferredTerminal,
       preferredEditor: config.preferredEditor

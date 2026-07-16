@@ -38,6 +38,12 @@ cp MainApp/RightMenuMaster.entitlements "$MAIN_ENTITLEMENTS"
 cp FinderExtension/FinderExtension.entitlements "$EXTENSION_ENTITLEMENTS"
 /usr/libexec/PlistBuddy -c "Set :com.apple.security.application-groups:0 $APP_GROUP" "$MAIN_ENTITLEMENTS"
 /usr/libexec/PlistBuddy -c "Set :com.apple.security.application-groups:0 $APP_GROUP" "$EXTENSION_ENTITLEMENTS"
+# Free unsigned builds cannot provide a stable sandbox identity across updates.
+# Keep Finder extension sandboxed, but let host enforce selected-folder policy
+# itself so one Home selection covers ordinary descendants without repeated OS prompts.
+/usr/libexec/PlistBuddy -c 'Delete :com.apple.security.app-sandbox' "$MAIN_ENTITLEMENTS"
+/usr/libexec/PlistBuddy -c 'Delete :com.apple.security.files.bookmarks.app-scope' "$MAIN_ENTITLEMENTS"
+/usr/libexec/PlistBuddy -c 'Delete :com.apple.security.files.user-selected.read-write' "$MAIN_ENTITLEMENTS"
 
 codesign --force --sign - --options runtime --entitlements "$EXTENSION_ENTITLEMENTS" "$EXTENSION"
 codesign --force --sign - --options runtime --entitlements "$MAIN_ENTITLEMENTS" "$APP"

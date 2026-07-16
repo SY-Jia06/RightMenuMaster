@@ -71,7 +71,7 @@ Windows 不属于 v2 支持范围，不参与构建、测试、打包或发布�
 
 ## 分发与安全
 
-免费的 GitHub Beta 使用 ad-hoc 签名且未经 Apple 公证。macOS 会拦截首次启动，用户需要在“隐私与安全”中明确点击“仍要打开”。未来若要实现低摩擦安装，仍需 Developer ID 签名与 Apple 公证。
+免费的 GitHub Beta 使用 ad-hoc 签名且未经 Apple 公证。主程序不启用 App Sandbox，Finder 扩展仍保持沙盒化；用户选择的目录由程序自身白名单约束。macOS 会拦截首次启动，用户需要在“隐私与安全”中明确点击“仍要打开”。未来若要实现低摩擦且完全沙盒化的安装，仍需 Developer ID 签名与 Apple 公证。
 
 项目不会要求用户移除隔离属性或关闭 Gatekeeper。完整发布门禁见 [docs/security-and-release.md](docs/security-and-release.md)。
 

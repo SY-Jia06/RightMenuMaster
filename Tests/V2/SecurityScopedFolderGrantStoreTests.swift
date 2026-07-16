@@ -23,6 +23,7 @@ final class SecurityScopedFolderGrantStoreTests: XCTestCase {
       monitoredFoldersDefaults: nil,
       storageKey: "grants",
       fileManager: fileManager,
+      usesSecurityScopedAccess: true,
       startAccessing: { _ in
         startCount += 1
         return true
@@ -40,5 +41,45 @@ final class SecurityScopedFolderGrantStoreTests: XCTestCase {
 
     try store.revoke(grant)
     XCTAssertEqual(stopCount, 1)
+  }
+
+  func testHomeGrantExpandsFinderMonitoringWithoutLibraryOrHiddenFolders() throws {
+    let fileManager = FileManager.default
+    let home = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let work = home.appendingPathComponent("Work", isDirectory: true)
+    let library = home.appendingPathComponent("Library", isDirectory: true)
+    let hidden = home.appendingPathComponent(".private", isDirectory: true)
+    try fileManager.createDirectory(at: work, withIntermediateDirectories: true)
+    try fileManager.createDirectory(at: library, withIntermediateDirectories: true)
+    try fileManager.createDirectory(at: hidden, withIntermediateDirectories: true)
+    defer { try? fileManager.removeItem(at: home) }
+
+    let grantsSuite = "RightMenuMaster.HomeGrantTests.\(UUID().uuidString)"
+    let monitorSuite = "RightMenuMaster.HomeMonitorTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: grantsSuite))
+    let monitoredDefaults = try XCTUnwrap(UserDefaults(suiteName: monitorSuite))
+    defer {
+      defaults.removePersistentDomain(forName: grantsSuite)
+      monitoredDefaults.removePersistentDomain(forName: monitorSuite)
+    }
+
+    let store = SecurityScopedFolderGrantStore(
+      defaults: defaults,
+      monitoredFoldersDefaults: monitoredDefaults,
+      storageKey: "grants",
+      monitoredFoldersKey: "monitored",
+      fileManager: fileManager,
+      homeDirectoryURL: home,
+      usesSecurityScopedAccess: true,
+      startAccessing: { _ in true },
+      stopAccessing: { _ in }
+    )
+    _ = try store.authorize(home)
+
+    let monitored = try XCTUnwrap(monitoredDefaults.stringArray(forKey: "monitored"))
+    XCTAssertTrue(monitored.contains(home.path))
+    XCTAssertTrue(monitored.contains(work.path))
+    XCTAssertFalse(monitored.contains(library.path))
+    XCTAssertFalse(monitored.contains(hidden.path))
   }
 }

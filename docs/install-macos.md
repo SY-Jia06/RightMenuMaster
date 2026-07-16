@@ -30,9 +30,13 @@ The folder choice controls both where the Finder menu appears and where **New Fi
 
 One selected local folder covers all ordinary descendants. macOS treats cloud File Provider roots and other applications' protected containers as separate privacy boundaries; choose a cloud root separately if you want Right Click Master there. The app never asks to cross another application's protected container automatically.
 
+When upgrading from Beta 2, the app reads the existing folder selection. If Finder still shows no menu, select the same top-level folder once in **Settings → System** to refresh the unsigned build's bookmark.
+
 文件夹授权同时决定右键菜单出现的范围，以及“新建文件”可写入的位置。之后可在 **设置 → 系统** 中增删授权目录。
 
 一个本地顶层文件夹的授权会覆盖所有普通子目录。macOS 会把云盘 File Provider 根目录及其他应用的受保护容器视作独立隐私边界；如需在云盘中使用，请单独选择对应云盘根目录。应用不会自动跨越其他 App 的受保护容器。
+
+从 Beta 2 升级时，应用会读取原有目录选择。如果 Finder 仍未显示菜单，请在 **设置 → 系统** 中重新选择同一个顶层目录一次，以刷新免费签名版本的 bookmark。
 
 ## Permissions / 权限
 

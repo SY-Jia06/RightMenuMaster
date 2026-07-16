@@ -8,9 +8,11 @@ The legacy Finder extension also grants temporary read/write exceptions rooted a
 
 ## Free Unsigned Beta
 
-The GitHub beta is ad-hoc signed so nested code and sandbox entitlements remain internally consistent, but it has no Developer ID identity or Apple notarization ticket. Gatekeeper therefore blocks first launch. Users must explicitly allow the app through **System Settings → Privacy & Security → Open Anyway**. The project never asks users to disable Gatekeeper or remove quarantine attributes.
+The GitHub beta is ad-hoc signed so nested code and Finder-extension entitlements remain internally consistent, but it has no Developer ID identity or Apple notarization ticket. Gatekeeper therefore blocks first launch. Users must explicitly allow the app through **System Settings → Privacy & Security → Open Anyway**. The project never asks users to disable Gatekeeper or remove quarantine attributes.
 
-`scripts/package-unsigned-macos.sh` builds the Release configuration, removes development-only entitlements, applies ad-hoc Hardened Runtime signatures to the Finder extension and host, creates a DMG, and writes a SHA-256 checksum.
+The free unsigned host app is not sandboxed because ad-hoc updates cannot provide a stable sandbox identity and a Home bookmark cannot enumerate the ordinary first-level folders Finder Sync requires. The host still enforces the user's selected folder roots in application logic, excludes hidden Home roots and `Library` from Finder monitoring, performs no network requests, and exposes no arbitrary scripts. The embedded Finder extension remains sandboxed. A future Developer ID build keeps both processes sandboxed.
+
+`scripts/package-unsigned-macos.sh` builds the Release configuration, applies an ad-hoc Hardened Runtime signature, keeps the Finder extension sandboxed, creates a DMG, and writes a SHA-256 checksum.
 
 ## Future Notarized Release Gate
 
