@@ -11,7 +11,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "2.0.0-beta.1"
+    MARKETING_VERSION: "2.0.0-beta.2"
     CURRENT_PROJECT_VERSION: "2"
     ENABLE_HARDENED_RUNTIME: true
     DEAD_CODE_STRIPPING: true

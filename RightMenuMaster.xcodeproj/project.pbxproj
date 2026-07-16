@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		002D3AD1565C206B5BB3683F /* V2ConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61D5893CD1498A110E81BC2E /* V2ConfigurationStore.swift */; };
 		0473B94051245FC271CD831A /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 960D6B867899A1165B535BB9 /* RootView.swift */; };
+		0534370D63CFBAA9BBBA6F8C /* SecurityScopedFolderGrantStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77AF9BD31FD7535F22C823C7 /* SecurityScopedFolderGrantStoreTests.swift */; };
 		0ECE6BAE18DA020BEBA6C070 /* V2Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = C65A2E54771E068D7BD23457 /* V2Constants.swift */; };
 		12FF435E7C1D76A7759DB11F /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B220494AE56BB44C06505B /* OnboardingView.swift */; };
 		1510CA375F0AE31E0984063C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 440FA24A53360C1C890E71F0 /* SettingsView.swift */; };
@@ -90,6 +91,7 @@
 		63541EE779D468BAA5640838 /* NativeApplicationLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeApplicationLauncher.swift; sourceTree = "<group>"; };
 		6F2BF0D883BB82E4F222B18F /* ActionRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionRequest.swift; sourceTree = "<group>"; };
 		6F2E7C864098585F0618B22E /* NewFilePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewFilePanel.swift; sourceTree = "<group>"; };
+		77AF9BD31FD7535F22C823C7 /* SecurityScopedFolderGrantStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityScopedFolderGrantStoreTests.swift; sourceTree = "<group>"; };
 		7A09F14861A9B665C597C04A /* FinderExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FinderExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		7E2DE82F59BAE0C0A0F6A72B /* AppCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCoordinator.swift; sourceTree = "<group>"; };
 		861618ECF46ADCF5A5CCD913 /* V2Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V2Presentation.swift; sourceTree = "<group>"; };
@@ -254,6 +256,7 @@
 				3FCB733A63D32EC442B0F3D8 /* ContextResolverV2Tests.swift */,
 				1023900EDB1B1C4E3A8919DC /* ProductModelsV2Tests.swift */,
 				DED6EE2F13EEB695CCD9612C /* SafeFileCreationV2Tests.swift */,
+				77AF9BD31FD7535F22C823C7 /* SecurityScopedFolderGrantStoreTests.swift */,
 			);
 			path = V2;
 			sourceTree = "<group>";
@@ -392,6 +395,7 @@
 				6B3DCC23B23DB00C32A1EE2A /* FinderSyncActionContractTests.swift in Sources */,
 				3440C9941DA234A35C21C75F /* ProductModelsV2Tests.swift in Sources */,
 				AAAAF0937E5A94FB4D366FEA /* SafeFileCreationV2Tests.swift in Sources */,
+				0534370D63CFBAA9BBBA6F8C /* SecurityScopedFolderGrantStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -536,7 +540,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
-				MARKETING_VERSION = "2.0.0-beta.1";
+				MARKETING_VERSION = "2.0.0-beta.2";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -621,7 +625,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
-				MARKETING_VERSION = "2.0.0-beta.1";
+				MARKETING_VERSION = "2.0.0-beta.2";
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

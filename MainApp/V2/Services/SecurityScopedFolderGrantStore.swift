@@ -49,19 +49,30 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
   private let storageKey: String
   private let monitoredFoldersKey: String
   private let fileManager: FileManager
+  private let startAccessing: (URL) -> Bool
+  private let stopAccessing: (URL) -> Void
+  /// Keep each granted root active for the lifetime of the host process.
+  /// Reopening and immediately closing a security scope for every Finder action
+  /// can cause macOS privacy services to reassess descendants repeatedly,
+  /// especially when Documents is backed by a File Provider.
+  private var activeAccessURLs: [UUID: URL] = [:]
 
   init(
     defaults: UserDefaults = .standard,
     monitoredFoldersDefaults: UserDefaults? = UserDefaults(suiteName: Constants.appGroupID),
     storageKey: String = "v2.securityScopedFolderGrants",
     monitoredFoldersKey: String = Constants.v2MonitoredFolderPathsKey,
-    fileManager: FileManager = .default
+    fileManager: FileManager = .default,
+    startAccessing: @escaping (URL) -> Bool = { $0.startAccessingSecurityScopedResource() },
+    stopAccessing: @escaping (URL) -> Void = { $0.stopAccessingSecurityScopedResource() }
   ) {
     self.defaults = defaults
     self.monitoredFoldersDefaults = monitoredFoldersDefaults
     self.storageKey = storageKey
     self.monitoredFoldersKey = monitoredFoldersKey
     self.fileManager = fileManager
+    self.startAccessing = startAccessing
+    self.stopAccessing = stopAccessing
     load()
   }
 
@@ -87,10 +98,15 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
       bookmarkData: bookmark
     )
 
+    let replaced = grants.filter { pathsAreEqual($0.path, grant.path) }
+    for oldGrant in replaced {
+      stopPersistentAccess(for: oldGrant)
+    }
     grants.removeAll { pathsAreEqual($0.path, grant.path) }
     grants.append(grant)
     grants.sort { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
     try persist()
+    _ = try ensurePersistentAccess(for: grant)
     return grant
   }
 
@@ -148,6 +164,7 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
   }
 
   func revoke(_ grant: SecurityScopedFolderGrant) throws {
+    stopPersistentAccess(for: grant)
     grants.removeAll { $0.id == grant.id }
     try persist()
   }
@@ -164,11 +181,7 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
     guard let grant = grant(containing: url) else {
       throw SecurityScopedGrantError.noGrant(url)
     }
-    let grantedURL = try resolve(grant)
-    guard grantedURL.startAccessingSecurityScopedResource() else {
-      throw SecurityScopedGrantError.accessDenied(grant.displayName)
-    }
-    defer { grantedURL.stopAccessingSecurityScopedResource() }
+    _ = try ensurePersistentAccess(for: grant)
     return try operation(url)
   }
 
@@ -176,11 +189,7 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
     guard let grant = grant(containing: url) else {
       throw SecurityScopedGrantError.noGrant(url)
     }
-    let grantedURL = try resolve(grant)
-    guard grantedURL.startAccessingSecurityScopedResource() else {
-      throw SecurityScopedGrantError.accessDenied(grant.displayName)
-    }
-    defer { grantedURL.stopAccessingSecurityScopedResource() }
+    _ = try ensurePersistentAccess(for: grant)
     return try await operation(url)
   }
 
@@ -195,23 +204,27 @@ final class SecurityScopedFolderGrantStore: ObservableObject {
       }
     }
 
-    var accessedURLs: [URL] = []
     for grant in uniqueGrants {
-      let grantedURL = try resolve(grant)
-      guard grantedURL.startAccessingSecurityScopedResource() else {
-        for accessedURL in accessedURLs {
-          accessedURL.stopAccessingSecurityScopedResource()
-        }
-        throw SecurityScopedGrantError.accessDenied(grant.displayName)
-      }
-      accessedURLs.append(grantedURL)
-    }
-    defer {
-      for accessedURL in accessedURLs {
-        accessedURL.stopAccessingSecurityScopedResource()
-      }
+      _ = try ensurePersistentAccess(for: grant)
     }
     return try await operation(urls)
+  }
+
+  private func ensurePersistentAccess(for grant: SecurityScopedFolderGrant) throws -> URL {
+    if let activeURL = activeAccessURLs[grant.id] {
+      return activeURL
+    }
+    let grantedURL = try resolve(grant)
+    guard startAccessing(grantedURL) else {
+      throw SecurityScopedGrantError.accessDenied(grant.displayName)
+    }
+    activeAccessURLs[grant.id] = grantedURL
+    return grantedURL
+  }
+
+  private func stopPersistentAccess(for grant: SecurityScopedFolderGrant) {
+    guard let activeURL = activeAccessURLs.removeValue(forKey: grant.id) else { return }
+    stopAccessing(activeURL)
   }
 
   func resolve(_ grant: SecurityScopedFolderGrant) throws -> URL {

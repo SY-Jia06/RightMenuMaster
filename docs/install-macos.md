@@ -28,7 +28,11 @@
 
 The folder choice controls both where the Finder menu appears and where **New File** may write. You can add or revoke folders later in **Settings → System**.
 
+One selected local folder covers all ordinary descendants. macOS treats cloud File Provider roots and other applications' protected containers as separate privacy boundaries; choose a cloud root separately if you want Right Click Master there. The app never asks to cross another application's protected container automatically.
+
 文件夹授权同时决定右键菜单出现的范围，以及“新建文件”可写入的位置。之后可在 **设置 → 系统** 中增删授权目录。
+
+一个本地顶层文件夹的授权会覆盖所有普通子目录。macOS 会把云盘 File Provider 根目录及其他应用的受保护容器视作独立隐私边界；如需在云盘中使用，请单独选择对应云盘根目录。应用不会自动跨越其他 App 的受保护容器。
 
 ## Permissions / 权限
 

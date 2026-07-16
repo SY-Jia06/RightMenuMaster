@@ -97,6 +97,7 @@ Settings save immediately. Diagnostics exclude usernames, filenames, and paths u
 ## Acceptance Criteria
 
 - A new user reaches a working context menu within two minutes.
+- One granted local root remains active and covers all ordinary descendants without repeated permission prompts.
 - All four actions match the context table in every supported Finder invocation context.
 - New File cannot overwrite an existing file under concurrent invocation.
 - Main settings window may quit while shell actions remain available on demand.
