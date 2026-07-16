@@ -6,7 +6,13 @@ The installed development build is signed with `Apple Development`, includes deb
 
 The legacy Finder extension also grants temporary read/write exceptions rooted at `/`, while the product exposes scripts and destructive file actions. Version 2 removes that combination from the public surface.
 
-## macOS Release Gate
+## Free Unsigned Beta
+
+The GitHub beta is ad-hoc signed so nested code and sandbox entitlements remain internally consistent, but it has no Developer ID identity or Apple notarization ticket. Gatekeeper therefore blocks first launch. Users must explicitly allow the app through **System Settings → Privacy & Security → Open Anyway**. The project never asks users to disable Gatekeeper or remove quarantine attributes.
+
+`scripts/package-unsigned-macos.sh` builds the Release configuration, removes development-only entitlements, applies ad-hoc Hardened Runtime signatures to the Finder extension and host, creates a DMG, and writes a SHA-256 checksum.
+
+## Future Notarized Release Gate
 
 A public artifact must pass every command:
 
@@ -40,7 +46,7 @@ The macOS release workflow expects these GitHub Actions secrets:
 - `NOTARY_KEY_ID`
 - `NOTARY_ISSUER_ID`
 
-A manual workflow run produces an unpublished artifact for inspection. A signed `v*` tag also creates or updates the matching GitHub Release.
+A manual workflow run produces an unpublished notarized artifact for inspection after credentials are configured. Publishing the free unsigned beta does not invoke this workflow.
 
 ## Windows Status
 
@@ -48,4 +54,4 @@ Windows is not a supported or released Version 2 platform. No Windows artifact o
 
 ## Local Development
 
-Development builds may use Apple Development or ad-hoc signing. Development scripts must label these artifacts as non-distributable and must not publish them to Releases.
+Development builds may use Apple Development signing. Public free beta artifacts are explicitly named `unsigned` and documented as unnotarized.

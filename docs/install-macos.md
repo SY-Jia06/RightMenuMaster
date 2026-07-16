@@ -2,13 +2,17 @@
 
 ## Install / 安装
 
-1. Download the signed and notarized DMG from the GitHub Release page. Do not use the repository source archive as an app installer.
+1. Download the unsigned DMG from the GitHub Release page. Do not use the repository source archive as an app installer.
 2. Open the DMG and drag **Right Click Master** to **Applications**.
-3. Launch the app from Applications and follow the four-step setup.
+3. Try to launch the app once. macOS will block this unnotarized build.
+4. Open **System Settings → Privacy & Security**, scroll to Security, and click **Open Anyway** for Right Click Master. Confirm with your login password.
+5. Launch the app again and follow the four-step setup.
 
-1. 从 GitHub Release 页面下载已签名并经过 Apple 公证的 DMG。仓库源码压缩包不是应用安装包。
+1. 从 GitHub Release 页面下载未公证的 DMG。仓库源码压缩包不是应用安装包。
 2. 打开 DMG，将 **Right Click Master** 拖入 **应用程序**。
-3. 从“应用程序”启动，并完成四步引导。
+3. 先尝试启动一次；macOS 会拦截这个未公证版本。
+4. 打开 **系统设置 → 隐私与安全**，滚动到“安全性”，点击 Right Click Master 对应的 **仍要打开**，并输入登录密码确认。
+5. 再次启动应用，并完成四步引导。
 
 ## Setup choices / 设置选择
 
@@ -47,9 +51,9 @@ Not required: Accessibility, Screen Recording, Full Disk Access, administrator a
 - No menu: confirm the app is in Applications, the Finder extension is enabled, and the current folder is inside an allowed folder. Then press **Run Checks**.
 - An app is missing: open **Settings → Applications**, press **Detect Again**, or choose its `.app` manually.
 - A folder permission stopped working: remove that folder under **Settings → System**, then allow it again.
-- macOS reports an untrusted or damaged download: do not disable Gatekeeper or remove quarantine attributes. Download the notarized Release asset again and verify its SHA-256 file.
+- macOS blocks the app: use **Privacy & Security → Open Anyway** as described above. Do not disable Gatekeeper or remove quarantine attributes. Verify the published SHA-256 file before opening.
 
 - 没有菜单：确认应用位于“应用程序”、Finder 扩展已启用，且当前位置属于已授权目录；然后点击“运行检查”。
 - 找不到应用：打开 **设置 → 应用**，点击“重新检测”，或手动选择对应 `.app`。
 - 文件夹权限失效：在 **设置 → 系统** 中移除该目录，再重新授权。
-- macOS 提示来源不受信任或文件损坏：不要关闭 Gatekeeper，也不要移除隔离属性；请重新下载已公证的 Release 资产并核对 SHA-256。
+- macOS 拦截应用：按上文使用 **隐私与安全 → 仍要打开**。不要关闭 Gatekeeper，也不要移除隔离属性；打开前请核对发布的 SHA-256。

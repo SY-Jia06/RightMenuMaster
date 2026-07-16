@@ -71,7 +71,7 @@ Windows 不属于 v2 支持范围，不参与构建、测试、打包或发布�
 
 ## 分发与安全
 
-公开的 macOS 版本必须使用 Developer ID 签名、启用 Hardened Runtime、通过 Apple 公证并附带 stapled ticket。放在 GitHub 下载不等于可以跳过这些认证。
+免费的 GitHub Beta 使用 ad-hoc 签名且未经 Apple 公证。macOS 会拦截首次启动，用户需要在“隐私与安全”中明确点击“仍要打开”。未来若要实现低摩擦安装，仍需 Developer ID 签名与 Apple 公证。
 
 项目不会要求用户移除隔离属性或关闭 Gatekeeper。完整发布门禁见 [docs/security-and-release.md](docs/security-and-release.md)。
 

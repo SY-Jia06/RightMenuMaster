@@ -71,7 +71,7 @@ Windows is not supported, built, tested, packaged, or released in Version 2.
 
 ## Distribution and security
 
-A public macOS release must be signed with Developer ID, use Hardened Runtime, be notarized by Apple, and carry a stapled ticket. GitHub distribution does **not** remove these requirements.
+The free GitHub beta is ad-hoc signed and unnotarized. macOS blocks its first launch, so users must explicitly choose **Open Anyway** in Privacy & Security. A future frictionless release requires Developer ID signing and Apple notarization.
 
 This project never asks users to remove quarantine attributes or disable Gatekeeper. See [docs/security-and-release.md](docs/security-and-release.md) for the release gates.
 
