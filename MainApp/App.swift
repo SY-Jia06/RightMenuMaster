@@ -1,264 +1,274 @@
-import SwiftUI
 import AppKit
-import ApplicationServices
+import Combine
+import OSLog
+import SwiftUI
+
+private let appLifecycleLog = Logger(
+  subsystem: Bundle.main.bundleIdentifier ?? "io.github.syjia06.rightclickmaster",
+  category: "Lifecycle"
+)
 
 @main
-struct RightMenuMasterApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var viewModel = SettingsViewModel()
+struct RightClickMasterApp: App {
+  @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-                .environmentObject(viewModel)
-                .frame(minWidth: 640, minHeight: 500)
-                .onAppear {
-                    checkAndRequestInitialPermissions()
-                }
-        }
-        .handlesExternalEvents(matching: ["settings"])
-        .windowResizability(.contentSize)
-        .defaultSize(width: 700, height: 600)
-
-        Settings {
-            ContentView()
-                .environmentObject(viewModel)
-                .frame(minWidth: 640, minHeight: 500)
-        }
+  var body: some Scene {
+    Settings {
+      EmptyView()
     }
-    
-    private func checkAndRequestInitialPermissions() {
-        // Disabled auto-prompt during development to avoid blocking the UI.
-        // Users can manually click "Enable Everywhere" in the Permissions tab.
-        NSLog("[RightMenu] App launched. Authorized folders: \(AuthorizedFolderStore.shared.load().map(\.path))")
+    .commands {
+      CommandGroup(replacing: .appSettings) {
+        Button("Settings…") {
+          appDelegate.showMainWindow(force: true)
+        }
+        .keyboardShortcut(",", modifiers: .command)
+      }
     }
+  }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var statusItem: NSStatusItem?
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+  private let coordinator = AppCoordinator()
+  private var mainWindowController: NSWindowController?
+  private var newFileWindowController: NSWindowController?
+  private var subscriptions: Set<AnyCancellable> = []
+  private var receivedExternalCommand = false
+  private var finishedLaunching = false
+  private var suppressMainWindowForExternalLaunch = false
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        NSAppleEventManager.shared().setEventHandler(
-            self,
-            andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
-            forEventClass: AEEventClass(kInternetEventClass),
-            andEventID: AEEventID(kAEGetURL)
-        )
+  override init() {
+    super.init()
 
-        setupMenuBarIcon()
-    }
-
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        return false
-    }
-
-    private func setupMenuBarIcon() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "contextualmenu.and.cursorarrow", accessibilityDescription: "RightMenu Master")
-        }
-
-        let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Open Settings...", action: #selector(openSettings), keyEquivalent: ","))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Quit RightMenu Master", action: #selector(quitApp), keyEquivalent: "q"))
-        statusItem?.menu = menu
-    }
-
-    @objc private func openSettings() {
-        NSApp.activate(ignoringOtherApps: true)
-        if let window = NSApp.windows.first(where: { $0.title.contains("RightMenu") || $0.contentView != nil }) {
-            window.makeKeyAndOrderFront(nil)
+    coordinator.$newFileSession
+      .dropFirst()
+      .sink { [weak self] session in
+        guard let self else { return }
+        if let session {
+          self.showNewFileWindow(session: session)
         } else {
-            // Open settings window via external event
-            if let url = URL(string: "rightmenumaster://settings") {
-                NSWorkspace.shared.open(url)
-            }
+          self.closeNewFileWindow()
+          self.terminateIfExternalCommandFinished()
         }
+      }
+      .store(in: &subscriptions)
+
+    coordinator.$errorMessage
+      .dropFirst()
+      .compactMap { $0 }
+      .sink { [weak self] _ in
+        self?.showMainWindow(force: true)
+      }
+      .store(in: &subscriptions)
+  }
+
+  func applicationWillFinishLaunching(_ notification: Notification) {
+    NSAppleEventManager.shared().setEventHandler(
+      self,
+      andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
+      forEventClass: AEEventClass(kInternetEventClass),
+      andEventID: AEEventID(kAEGetURL)
+    )
+    DistributedNotificationCenter.default().addObserver(
+      self,
+      selector: #selector(handleFinderCommandReady(_:)),
+      name: Notification.Name(Constants.v2FinderCommandReadyNotificationName),
+      object: nil
+    )
+  }
+
+  func applicationDidFinishLaunching(_ notification: Notification) {
+    guard !isRunningUnitTests else { return }
+    if coordinator.hasPendingExternalRequests() {
+      receivedExternalCommand = true
+      suppressMainWindowForExternalLaunch = true
+    }
+    if coordinator.consumePendingExternalRequests() > 0 {
+      if let session = coordinator.newFileSession {
+        showNewFileWindow(session: session)
+      } else {
+        scheduleAutomaticTermination()
+      }
+    }
+    finishedLaunching = true
+    // URL activation is delivered during launch. A short deferral prevents
+    // an unnecessary settings-window flash for terminal/editor actions.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+      guard let self, !self.receivedExternalCommand else { return }
+      self.showMainWindow()
+    }
+  }
+
+  func applicationWillTerminate(_ notification: Notification) {
+    NSAppleEventManager.shared().removeEventHandler(
+      forEventClass: AEEventClass(kInternetEventClass),
+      andEventID: AEEventID(kAEGetURL)
+    )
+    DistributedNotificationCenter.default().removeObserver(
+      self,
+      name: Notification.Name(Constants.v2FinderCommandReadyNotificationName),
+      object: nil
+    )
+  }
+
+  func applicationShouldHandleReopen(
+    _ sender: NSApplication,
+    hasVisibleWindows flag: Bool
+  ) -> Bool {
+    guard !suppressMainWindowForExternalLaunch else { return false }
+    showMainWindow()
+    return true
+  }
+
+  func applicationShouldRestoreApplicationState(_ app: NSApplication) -> Bool { false }
+
+  func applicationShouldSaveApplicationState(_ app: NSApplication) -> Bool { false }
+
+  func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+    true
+  }
+
+  func windowWillClose(_ notification: Notification) {
+    guard let window = notification.object as? NSWindow else { return }
+    if window === newFileWindowController?.window {
+      newFileWindowController = nil
+      if coordinator.newFileSession != nil {
+        coordinator.dismissNewFile()
+      }
+    } else if window === mainWindowController?.window {
+      mainWindowController = nil
+    }
+  }
+
+  func showMainWindow(force: Bool = false) {
+    if force { suppressMainWindowForExternalLaunch = false }
+    guard !suppressMainWindowForExternalLaunch else { return }
+    if let window = mainWindowController?.window {
+      NSApp.activate(ignoringOtherApps: true)
+      window.makeKeyAndOrderFront(nil)
+      return
     }
 
-    @objc private func quitApp() {
-        NSApp.terminate(nil)
-    }
+    let rootView = RootView(coordinator: coordinator)
+    let hostingController = NSHostingController(rootView: rootView)
+    let window = NSWindow(contentViewController: hostingController)
+    window.title = "Right Click Master"
+    window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+    window.setContentSize(NSSize(width: 760, height: 560))
+    window.minSize = NSSize(width: 560, height: 440)
+    window.center()
+    window.setFrameAutosaveName("RightClickMaster.MainWindow")
+    window.delegate = self
+    window.isReleasedWhenClosed = false
+    window.isRestorable = false
 
-    @objc func handleGetURLEvent(
-        _ event: NSAppleEventDescriptor,
-        withReplyEvent replyEvent: NSAppleEventDescriptor
-    ) {
-        guard let urlString = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue,
-              let url = URL(string: urlString) else {
-            NSLog("[RightMenu] Ignored malformed URL apple event")
-            return
-        }
+    let controller = NSWindowController(window: window)
+    mainWindowController = controller
+    controller.showWindow(nil)
+    NSApp.activate(ignoringOtherApps: true)
+  }
 
-        AppCommandHandler.shared.handle(url)
-    }
-}
-
-final class AppCommandHandler {
-    static let shared = AppCommandHandler()
-
-    private let authorizedFolderStore = AuthorizedFolderStore.shared
-    private let pendingFileCreationStore = PendingFileCreationStore.shared
-
-    func handle(_ url: URL) {
-        guard url.scheme == AppCommandURL.scheme,
-              let command = AppCommand(rawValue: url.host ?? "") else {
-            NSLog("[RightMenu] Ignored app command URL: \(url.absoluteString)")
-            return
-        }
-
-        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        guard let path = components?
-            .queryItems?
-            .first(where: { $0.name == "path" })?
-            .value else {
-            NSLog("[RightMenu] Ignored app command URL without path: \(url.absoluteString)")
-            return
-        }
-
-        let fileURL = URL(fileURLWithPath: path)
-        NSLog("[RightMenu] MainApp command \(command.rawValue): \(fileURL.path)")
-
-        switch command {
-        case .openTerminal:
-            openTerminal(at: fileURL, appName: "Terminal")
-        case .openITerm:
-            openTerminal(at: fileURL, appName: "iTerm")
-        case .rename:
-            selectAndBeginRename(fileURL)
-        case .authorizeCreateFile:
-            let requestIDString = components?
-                .queryItems?
-                .first(where: { $0.name == "requestID" })?
-                .value
-            authorizeAndCreateFile(at: fileURL, requestIDString: requestIDString)
-        case .trashFile:
-            trashFile(at: fileURL)
-        }
-    }
-
-    private func openTerminal(at directoryURL: URL, appName: String) {
-        do {
-            try authorizedFolderStore.withAccess(to: directoryURL) {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-                process.arguments = ["-a", appName, directoryURL.path]
-                try process.run()
-                NSLog("[RightMenu] MainApp opened \(appName) at \(directoryURL.path)")
-            }
-        } catch {
-            NSLog("[RightMenu] MainApp open \(appName) failed: \(error.localizedDescription), path=\(directoryURL.path)")
-        }
-    }
-
-    private func trashFile(at fileURL: URL) {
-        let parentDirectory = fileURL.deletingLastPathComponent()
-        do {
-            try authorizedFolderStore.withAccess(to: parentDirectory) {
-                var trashedURL: NSURL?
-                try FileManager.default.trashItem(at: fileURL, resultingItemURL: &trashedURL)
-                NSLog("[RightMenu] MainApp trashed file: \(fileURL.path)")
-            }
-        } catch {
-            NSLog("[RightMenu] MainApp trash failed: \(error.localizedDescription), path=\(fileURL.path)")
-        }
-    }
-
-    private func authorizeAndCreateFile(at directoryURL: URL, requestIDString: String?) {
-        guard let requestIDString,
-              let requestID = UUID(uuidString: requestIDString),
-              let request = pendingFileCreationStore.load(id: requestID) else {
-            NSLog("[RightMenu] Missing pending file creation request: \(requestIDString ?? "nil")")
-            return
-        }
-
-        do {
-            // Check if we need authorization
-            if AuthorizedFolderStore.authorizedFolder(containing: directoryURL, in: authorizedFolderStore.load()) == nil {
-                NSLog("[RightMenu] Requesting folder access for: \(directoryURL.path)")
-                try requestFolderAccess(for: directoryURL)
-                // Notify extension about new authorization
-                postAuthorizedFoldersChangedNotification()
-            }
-
-            // Create the file with the (possibly newly) authorized access
-            let createdURL = try createPendingFile(request)
-            pendingFileCreationStore.remove(id: requestID)
-            selectAndBeginRename(createdURL)
-        } catch {
-            NSLog("[RightMenu] MainApp authorize/create file failed: \(error.localizedDescription), path=\(directoryURL.path)")
-            // Don't remove the pending request if it failed, so user can retry
-        }
-    }
-
-    private func requestFolderAccess(for directoryURL: URL) throws {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.directoryURL = directoryURL.deletingLastPathComponent()
-        panel.message = "Select \(directoryURL.lastPathComponent) or a parent folder to allow RightMenu Master to create files here."
-        panel.prompt = "Allow"
-
-        guard panel.runModal() == .OK,
-              let selectedURL = panel.urls.first else {
-            throw CocoaError(.userCancelled)
-        }
-
-        _ = try authorizedFolderStore.authorizeFolder(selectedURL)
-        NSLog("[RightMenu] MainApp authorized folder: \(selectedURL.path)")
-    }
-
-    private func createPendingFile(_ request: PendingFileCreationRequest) throws -> URL {
-        let directoryURL = URL(fileURLWithPath: request.directoryPath, isDirectory: true)
-        let fileURL = FileCreationPlanner.nextFileURL(in: directoryURL, template: request.template)
-        let data = request.template.content.data(using: .utf8) ?? Data()
-
-        try authorizedFolderStore.withAccess(to: directoryURL) {
-            try data.write(to: fileURL, options: .atomic)
-        }
-
-        NSLog("[RightMenu] MainApp created file: \(fileURL.path)")
-        return fileURL
-    }
-
-    private func postAuthorizedFoldersChangedNotification() {
-        DistributedNotificationCenter.default().postNotificationName(
-            Notification.Name(Constants.authorizedFoldersChangedNotificationName),
-            object: Bundle.main.bundleIdentifier,
-            userInfo: nil,
-            deliverImmediately: true
+  @objc private func handleGetURLEvent(
+    _ event: NSAppleEventDescriptor,
+    withReplyEvent replyEvent: NSAppleEventDescriptor
+  ) {
+    receivedExternalCommand = true
+    if !finishedLaunching { suppressMainWindowForExternalLaunch = true }
+    appLifecycleLog.notice("Received Finder command URL")
+    guard let value = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue,
+      let url = URL(string: value),
+      coordinator.consumeExternalURL(url)
+    else {
+      coordinator.reportError(
+        V2Presentation.text(
+          "The Finder request URL is invalid.",
+          "Finder 请求链接无效。",
+          language: coordinator.language
         )
+      )
+      return
     }
 
-    private func selectAndBeginRename(_ fileURL: URL) {
-        NSWorkspace.shared.activateFileViewerSelecting([fileURL])
-        
-        // Wait longer for Finder to fully select the file
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.pressReturnForRename()
-        }
+    if let session = coordinator.newFileSession {
+      showNewFileWindow(session: session)
+    } else {
+      scheduleAutomaticTermination()
+    }
+  }
+
+  @objc private func handleFinderCommandReady(_ notification: Notification) {
+    guard let value = notification.object as? String,
+      let requestID = UUID(uuidString: value)
+    else {
+      return
+    }
+    receivedExternalCommand = true
+    if !finishedLaunching { suppressMainWindowForExternalLaunch = true }
+    appLifecycleLog.notice(
+      "Received Finder command notification \(requestID.uuidString, privacy: .public)"
+    )
+    _ = coordinator.consumeExternalRequest(id: requestID)
+    if let session = coordinator.newFileSession {
+      showNewFileWindow(session: session)
+    } else {
+      scheduleAutomaticTermination()
+    }
+  }
+
+  private func showNewFileWindow(session: NewFileSession) {
+    appLifecycleLog.notice("Showing New File panel")
+    if let window = newFileWindowController?.window {
+      NSApp.activate(ignoringOtherApps: true)
+      window.makeKeyAndOrderFront(nil)
+      return
     }
 
-    private func pressReturnForRename() {
-        guard AXIsProcessTrusted() else {
-            NSLog("[RightMenu] MainApp rename skipped: Accessibility permission is not granted")
-            return
-        }
+    let view = NewFilePanel(coordinator: coordinator, session: session)
+    let hostingController = NSHostingController(rootView: view)
+    let panel = NSPanel(contentViewController: hostingController)
+    panel.title = V2Presentation.text(
+      "New File",
+      "新建文件",
+      language: coordinator.language
+    )
+    panel.styleMask = [.titled, .closable]
+    panel.setContentSize(NSSize(width: 500, height: 370))
+    panel.center()
+    panel.delegate = self
+    panel.isReleasedWhenClosed = false
 
-        let source = CGEventSource(stateID: .hidSystemState)
-        let returnKeyCode: CGKeyCode = 36
-        
-        // Press Return key to enter rename mode
-        // Finder's default behavior should select only the filename without extension
-        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: returnKeyCode, keyDown: true)
-        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: returnKeyCode, keyDown: false)
-        
-        keyDown?.post(tap: .cghidEventTap)
-        usleep(50000) // 50ms delay between key down and up
-        keyUp?.post(tap: .cghidEventTap)
-        
-        NSLog("[RightMenu] MainApp rename Return key posted")
+    let controller = NSWindowController(window: panel)
+    newFileWindowController = controller
+    controller.showWindow(nil)
+    NSApp.activate(ignoringOtherApps: true)
+  }
+
+  private func closeNewFileWindow() {
+    guard let controller = newFileWindowController else { return }
+    newFileWindowController = nil
+    controller.window?.delegate = nil
+    controller.close()
+  }
+
+  private func scheduleAutomaticTermination() {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+      self?.terminateIfExternalCommandFinished()
     }
+  }
+
+  private func terminateIfExternalCommandFinished() {
+    guard receivedExternalCommand,
+      mainWindowController?.window?.isVisible != true,
+      newFileWindowController?.window?.isVisible != true,
+      coordinator.errorMessage == nil
+    else {
+      return
+    }
+    NSApp.terminate(nil)
+  }
+
+  private var isRunningUnitTests: Bool {
+    ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+      || NSClassFromString("XCTestCase") != nil
+  }
 }

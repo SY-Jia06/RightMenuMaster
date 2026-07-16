@@ -1,4 +1,4 @@
-.PHONY: project build clean open install
+.PHONY: project build test clean open install install-debug release
 
 PROJECT := RightMenuMaster.xcodeproj
 SCHEME := RightMenuMaster
@@ -8,18 +8,24 @@ project:
 	open $(PROJECT)
 
 build:
-	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration Release build 2>&1
+	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration Debug build
 
 debug:
-	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration Debug build 2>&1
+	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration Debug build
+
+test:
+	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration Debug test
 
 clean:
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) clean
-	rm -rf ~/Library/Developer/Xcode/DerivedData/RightMenuMaster-*
 
 open:
 	open $(PROJECT)
 
-install: build
-	echo "Build complete. Copy the app to /Applications to install."
-	cp -R build/Release/RightMenuMaster.app /Applications/ 2>/dev/null || echo "Run manually: cp -R build/Release/RightMenuMaster.app /Applications/"
+install: install-debug
+
+install-debug:
+	scripts/install-debug.sh
+
+release:
+	scripts/release-macos.sh

@@ -3,9 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>RightMenu Master</string>
+	<string>Right Click Master</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleDisplayName</key>
-	<string>RightMenu Master</string>
+	<string>Right Click Master</string>
+	<key>RCMAppGroup</key>
+	<string>$(RCM_APP_GROUP)</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleVersion</key>
@@ -18,10 +22,10 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.rightmenu.master.commands</string>
+			<string>io.github.syjia06.rightclickmaster.commands</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>rightmenumaster</string>
+				<string>$(RCM_URL_SCHEME)</string>
 			</array>
 		</dict>
 	</array>
@@ -29,7 +33,5 @@
 	<string>14.5</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License</string>
-	<key>LSUIElement</key>
-	<true/>
 </dict>
 </plist>

@@ -1,0 +1,30 @@
+[
+  {
+    "name": "container",
+    "invocationKind": "container",
+    "subjects": ["/Users/example/Projects/demo"],
+    "newFileDirectory": "/Users/example/Projects/demo",
+    "copySubjects": ["/Users/example/Projects/demo"],
+    "terminalDirectory": "/Users/example/Projects/demo",
+    "editorSubjects": ["/Users/example/Projects/demo"]
+  },
+  {
+    "name": "one-file",
+    "invocationKind": "items",
+    "subjects": ["/Users/example/Projects/demo/notes.md"],
+    "newFileDirectory": "/Users/example/Projects/demo",
+    "copySubjects": ["/Users/example/Projects/demo/notes.md"],
+    "terminalDirectory": "/Users/example/Projects/demo",
+    "editorSubjects": ["/Users/example/Projects/demo/notes.md"]
+  },
+  {
+    "name": "one-folder",
+    "invocationKind": "items",
+    "subjects": ["/Users/example/Projects/demo/Sources"],
+    "directorySubjects": [0],
+    "newFileDirectory": "/Users/example/Projects/demo/Sources",
+    "copySubjects": ["/Users/example/Projects/demo/Sources"],
+    "terminalDirectory": "/Users/example/Projects/demo/Sources",
+    "editorSubjects": ["/Users/example/Projects/demo/Sources"]
+  }
+]

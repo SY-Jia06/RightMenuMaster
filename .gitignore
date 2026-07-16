@@ -5,6 +5,7 @@ DerivedData
 *.xcscmblueprint
 .DS_Store
 .build
+.artifacts
 Packages
 *.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 *.xcodeproj/project.xcworkspace/xcuserdata
