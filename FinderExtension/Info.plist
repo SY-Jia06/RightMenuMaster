@@ -11,8 +11,12 @@
 	</dict>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleDisplayName</key>
-	<string>RightMenu Master</string>
+	<string>Right Click Master</string>
+	<key>RCMAppGroup</key>
+	<string>$(RCM_APP_GROUP)</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleVersion</key>
@@ -23,8 +27,6 @@
 	<string>XPC!</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.5</string>
-	<key>NSAppleEventsUsageDescription</key>
-	<string>RightMenu Master uses accessibility automation only to enter rename mode after creating a file.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License</string>
 </dict>

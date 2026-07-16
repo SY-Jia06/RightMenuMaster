@@ -1,0 +1,129 @@
+name: Release macOS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-macos-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  notarized-dmg:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.3
+        run: sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+
+      - name: Show toolchain
+        run: xcodebuild -version
+
+      - name: Install pinned XcodeGen
+        env:
+          XCODEGEN_VERSION: 2.45.4
+          XCODEGEN_SHA256: 090ec29491aad50aec10631bf6e62253fed733c50f3aab0f5ffc86bc170bdbef
+        run: |
+          ARCHIVE="$RUNNER_TEMP/xcodegen.zip"
+          DESTINATION="$RUNNER_TEMP/xcodegen"
+          curl --proto '=https' --tlsv1.2 --location --fail --silent --show-error \
+            --output "$ARCHIVE" \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/$XCODEGEN_VERSION/xcodegen.zip"
+          printf '%s  %s\n' "$XCODEGEN_SHA256" "$ARCHIVE" | shasum -a 256 -c -
+          mkdir -p "$DESTINATION"
+          ditto -x -k "$ARCHIVE" "$DESTINATION"
+          echo "$DESTINATION/xcodegen/bin" >> "$GITHUB_PATH"
+          "$DESTINATION/xcodegen/bin/xcodegen" --version | grep -F "Version: $XCODEGEN_VERSION"
+
+      - name: Regenerate project and verify committed output
+        run: |
+          xcodegen generate
+          git diff --exit-code -- RightMenuMaster.xcodeproj
+
+      - name: Run macOS tests
+        run: |
+          xcodebuild test \
+            -project RightMenuMaster.xcodeproj \
+            -scheme RightMenuMaster \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/test-derived-data" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Import Developer ID certificate
+        env:
+          CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/developer-id.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/right-click-master.keychain-db"
+          printf '%s' "$CERTIFICATE_P12_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH" | \
+            grep -F 'Developer ID Application:'
+
+      - name: Configure notarization credentials
+        env:
+          NOTARY_API_KEY_P8_BASE64: ${{ secrets.NOTARY_API_KEY_P8_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          API_KEY_PATH="$RUNNER_TEMP/AuthKey_${NOTARY_KEY_ID}.p8"
+          printf '%s' "$NOTARY_API_KEY_P8_BASE64" | base64 --decode > "$API_KEY_PATH"
+          xcrun notarytool store-credentials right-click-master-notary \
+            --key "$API_KEY_PATH" \
+            --key-id "$NOTARY_KEY_ID" \
+            --issuer "$NOTARY_ISSUER_ID" \
+            --keychain "$RUNNER_TEMP/right-click-master.keychain-db"
+
+      - name: Build, audit, notarize, and staple
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MACOS_SIGNING_IDENTITY: Developer ID Application
+          NOTARY_KEYCHAIN_PROFILE: right-click-master-notary
+          NOTARY_KEYCHAIN: ${{ runner.temp }}/right-click-master.keychain-db
+        run: scripts/release-macos.sh
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RightClickMaster-macOS
+          path: |
+            .artifacts/macos/*.dmg
+            .artifacts/macos/*.sha256
+            .artifacts/macos/notary-*.json
+          if-no-files-found: error
+
+      - name: Publish tagged release assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
+          gh release upload "$GITHUB_REF_NAME" \
+            .artifacts/macos/*.dmg \
+            .artifacts/macos/*.sha256 \
+            .artifacts/macos/notary-*.json
+
+      - name: Remove temporary signing keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/right-click-master.keychain-db" 2>/dev/null || true

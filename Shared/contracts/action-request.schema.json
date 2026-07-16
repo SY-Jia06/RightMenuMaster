@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rightclickmaster.dev/schemas/action-request-v1.json",
+  "title": "Right Click Master Action Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "action", "invocationKind", "subjects", "createdAt"],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "action": {
+      "enum": ["newFile", "copyPath", "openTerminal", "openEditor"]
+    },
+    "invocationKind": {
+      "enum": ["container", "items"]
+    },
+    "subjects": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "maxItems": 512
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "invocationKind": { "const": "container" }
+        },
+        "required": ["invocationKind"]
+      },
+      "then": {
+        "properties": {
+          "subjects": { "minItems": 1, "maxItems": 1 }
+        }
+      },
+      "else": {
+        "properties": {
+          "subjects": { "minItems": 1 }
+        }
+      }
+    }
+  ]
+}
